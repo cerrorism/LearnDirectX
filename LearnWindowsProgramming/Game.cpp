@@ -19,21 +19,41 @@ Game::Game()
 void Game::setWindow(HWND window)
 {
 	resource->createDevice();
-	for (const Model& m : models) {
-		loadedModels.push_back(resource->loadModel(m));
-	}
 	this->window = window;
 	resource->createWindowResources(window);
 
 	world = Matrix::Identity;
+	for (const Model& m : models) {
+		loadedModels.push_back(resource->loadModel(m));
+	}
 }
 
 void Game::updateWindowSize(int width, int height)
 {
-	resource->resize(width, height);
-	view = Matrix::CreateViewLookAt(Vector3(0.0f, 0.7f, 1.5f), Vector3(0.0f, -0.1f, 0.0f), Vector3(0.0f, 1.0f, 0.0f));
+	DirectX::XMVECTOR eye = DirectX::XMVectorSet(0.0f, 0.7f, 1.5f, 0.f);
+	DirectX::XMVECTOR at = DirectX::XMVectorSet(0.0f, -0.1f, 0.0f, 0.f);
+	DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.f);
+
+	DirectX::XMStoreFloat4x4(
+		&view,
+		DirectX::XMMatrixLookAtRH(
+			eye,
+			at,
+			up
+		)
+	);
+
 	float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-	projection = Matrix::CreatePerspectiveFieldOfView(DirectX::XMConvertToRadians(70), aspectRatio, 0.1f, 1000.f);
+
+	DirectX::XMStoreFloat4x4(
+		&projection,
+		DirectX::XMMatrixPerspectiveFovRH(
+			DirectX::XMConvertToRadians(70),
+			aspectRatio,
+			0.01f,
+			100.0f
+		)
+	);
 }
 
 
@@ -67,8 +87,14 @@ void Game::tick()
 
 void Game::update()
 {
-	float time = float(timer->GetTotalSeconds());
-	world = Matrix::CreateRotationZ(cosf(time / 4.0f));
+	DirectX::XMStoreFloat4x4(
+		&world,
+		DirectX::XMMatrixRotationY(
+			DirectX::XMConvertToRadians(
+				timer->GetFrameCount() / 500
+			)
+		)
+	);
 }
 
 void Game::render()

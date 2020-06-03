@@ -62,9 +62,6 @@ void InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow)
 {
-	if (!XMVerifyCPUSupport())
-		return 1;
-
 	// Perform application initialization:
 	InitInstance(hInstance, nCmdShow);
 

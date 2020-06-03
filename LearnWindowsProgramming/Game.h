@@ -20,10 +20,14 @@ private:
 	std::unique_ptr<DirectXResource> resource;
 	std::unique_ptr<GameTimer> timer = std::make_unique<GameTimer>();
 	HWND window = nullptr;
-
+	/*
 	Matrix world;
 	Matrix view;
 	Matrix projection;
+	*/
+	DirectX::XMFLOAT4X4 world;
+	DirectX::XMFLOAT4X4 view;
+	DirectX::XMFLOAT4X4 projection;
 	std::vector<Model> models;
 	std::vector<LoadedModel> loadedModels;
 

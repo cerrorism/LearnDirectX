@@ -19,6 +19,7 @@ public:
 	void resize(int width, int height);
 	void clear();
 	void draw(const LoadedModel& model, const Matrix& world, const Matrix& view, const Matrix& projection);
+	void draw(const LoadedModel& model, const DirectX::XMFLOAT4X4& world, const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& projection);
 	void present();
 	LoadedModel loadModel(const Model& model);
 private:

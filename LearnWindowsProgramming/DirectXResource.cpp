@@ -93,6 +93,18 @@ void DirectXResource::createDevice()
 
 void DirectXResource::createWindowResources(HWND hwnd) {
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+	swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
+	swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+	swapChainDesc.BufferDesc.Format = backBufferFormat;
+	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.BufferCount = 2;
+	swapChainDesc.OutputWindow = hwnd;
+	swapChainDesc.Windowed = true;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+	/*
 	swapChainDesc.BufferDesc.Format = backBufferFormat;
 	swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 	swapChainDesc.OutputWindow = hwnd;
@@ -102,6 +114,8 @@ void DirectXResource::createWindowResources(HWND hwnd) {
 	swapChainDesc.SampleDesc.Quality = 0;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+	*/
+	
 
 	com_ptr<IDXGIAdapter> adapter;
 	device.as<IDXGIDevice>()->GetAdapter(adapter.put());
@@ -181,7 +195,7 @@ void DirectXResource::draw(const LoadedModel& model, const Matrix& world, const 
 	XMFLOAT4X4 preCalculatedMatrix;
 	DirectX::XMStoreFloat4x4(&preCalculatedMatrix,
 		DirectX::XMMatrixTranspose(
-		DirectX::XMLoadFloat4x4(&world) *
+			DirectX::XMLoadFloat4x4(&world) *
 			DirectX::XMLoadFloat4x4(&view) *
 			DirectX::XMLoadFloat4x4(&projection)
 		));
@@ -194,7 +208,44 @@ void DirectXResource::draw(const LoadedModel& model, const Matrix& world, const 
 		0,
 		0
 	);
-	
+
+
+	UINT stride = sizeof(Vertex);
+	UINT offset = 0;
+	context->IASetVertexBuffers(0, 1, single_list(model.vertexBuffer.get()), &stride, &offset);
+	context->IASetIndexBuffer(model.indexBuffer.get(), DXGI_FORMAT_R32_UINT, 0);
+
+	context->IASetInputLayout(model.inputLayout.get());
+	context->IASetPrimitiveTopology(model.topology);
+	context->VSSetShader(model.vertexShader.get(), nullptr, 0);
+	context->VSSetConstantBuffers(
+		0,
+		1,
+		single_list(model.constantBuffer.get())
+	);
+	context->PSSetShader(model.pixelShader.get(), nullptr, 0);
+	context->DrawIndexed(model.indexSize, 0, 0);
+}
+
+void DirectXResource::draw(const LoadedModel& model, const DirectX::XMFLOAT4X4& world, const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& projection)
+{
+	XMFLOAT4X4 preCalculatedMatrix;
+	DirectX::XMStoreFloat4x4(&preCalculatedMatrix,
+		DirectX::XMMatrixTranspose(
+			DirectX::XMLoadFloat4x4(&world) *
+			DirectX::XMLoadFloat4x4(&view) *
+			DirectX::XMLoadFloat4x4(&projection)
+		));
+
+	context->UpdateSubresource(
+		model.constantBuffer.get(),
+		0,
+		nullptr,
+		&preCalculatedMatrix,
+		0,
+		0
+	);
+
 
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
