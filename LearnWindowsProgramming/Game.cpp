@@ -16,11 +16,11 @@ Game::Game()
 	models.push_back(Cube());
 }
 
-void Game::setWindow(HWND window)
+void Game::setWindow(HWND window, unsigned int width, unsigned int height)
 {
 	resource->createDevice();
 	this->window = window;
-	resource->createWindowResources(window);
+	resource->createWindowResources(window, width, height);
 
 	world = Matrix::Identity;
 	for (const Model& m : models) {
@@ -28,7 +28,7 @@ void Game::setWindow(HWND window)
 	}
 }
 
-void Game::updateWindowSize(int width, int height)
+void Game::updateWindowSize(unsigned int width, unsigned int height)
 {
 	DirectX::XMVECTOR eye = DirectX::XMVectorSet(0.0f, 0.7f, 1.5f, 0.f);
 	DirectX::XMVECTOR at = DirectX::XMVectorSet(0.0f, -0.1f, 0.0f, 0.f);

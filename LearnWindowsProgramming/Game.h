@@ -11,8 +11,8 @@ class Game
 {
 public:
 	Game();
-	void setWindow(HWND window);
-	void updateWindowSize(int width, int height);
+	void setWindow(HWND window, unsigned int width, unsigned int height);
+	void updateWindowSize(unsigned int width, unsigned int height);
 	void tick();
 	screen_size defaultScreenSize();
 

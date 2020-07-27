@@ -20,6 +20,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_SIZE:
 		game->updateWindowSize(LOWORD(lParam), HIWORD(lParam));
 		break;
+	case WM_LBUTTONDOWN:
+
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
@@ -54,7 +56,7 @@ void InitInstance(HINSTANCE hInstance, int nCmdShow)
 	auto hWnd = CreateWindow(windowClassName, TEXT("test window"), WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInstance, nullptr);
 	check_bool(hWnd);
-	game->setWindow(hWnd);
+	game->setWindow(hWnd, rc.right - rc.left, rc.bottom - rc.top);
 
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);

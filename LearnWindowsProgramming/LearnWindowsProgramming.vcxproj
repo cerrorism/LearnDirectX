@@ -169,6 +169,7 @@
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameTimer.h" />
     <ClInclude Include="LearnWindowsProgramming.h" />
+    <ClInclude Include="Matrix.h" />
     <ClInclude Include="models.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />

@@ -43,10 +43,10 @@ static const D3D_FEATURE_LEVEL featureLevels[] = {
 
 
 DirectXResource::DirectXResource(DXGI_FORMAT backBufferFormat, DXGI_FORMAT depthBufferFormat,
-	UINT backBufferCount, unsigned int flags)
+	UINT backBufferCount, unsigned int flags, unsigned int sampleCount)
 	:backBufferFormat(backBufferFormat), depthBufferFormat(depthBufferFormat),
 	backBufferCount(backBufferCount),
-	options(flags | FlipPresentFlag)
+	options(flags | FlipPresentFlag), sampleCount(sampleCount)
 {
 }
 
@@ -91,8 +91,10 @@ void DirectXResource::createDevice()
 #endif
 }
 
-void DirectXResource::createWindowResources(HWND hwnd) {
+void DirectXResource::createWindowResources(HWND hwnd, unsigned int width, unsigned int height) {
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+	swapChainDesc.BufferDesc.Width = width;
+	swapChainDesc.BufferDesc.Height = height;
 	swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
 	swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
 	swapChainDesc.BufferDesc.Format = backBufferFormat;
@@ -104,17 +106,6 @@ void DirectXResource::createWindowResources(HWND hwnd) {
 	swapChainDesc.Windowed = true;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-	/*
-	swapChainDesc.BufferDesc.Format = backBufferFormat;
-	swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	swapChainDesc.OutputWindow = hwnd;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.BufferCount = backBufferCount;
-	swapChainDesc.SampleDesc.Count = 1;
-	swapChainDesc.SampleDesc.Quality = 0;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-	*/
 	
 
 	com_ptr<IDXGIAdapter> adapter;
@@ -125,14 +116,17 @@ void DirectXResource::createWindowResources(HWND hwnd) {
 		&swapChainDesc,
 		swapChain.put()
 	));
-	configureBackBuffer();
+	configureBackBuffer(width, height);
 }
 
-void DirectXResource::configureBackBuffer()
+void DirectXResource::configureBackBuffer(unsigned int width, unsigned int height)
 {
-	backBuffer.capture(swapChain, &IDXGISwapChain::GetBuffer, 0);
-	check_hresult(device->CreateRenderTargetView(backBuffer.get(), nullptr, renderTargetView.put()));
-	backBuffer->GetDesc(&backBufferDesc);
+	renderTarget.capture(swapChain, &IDXGISwapChain::GetBuffer, 0);
+	check_hresult(device->CreateRenderTargetView(renderTarget.get(), nullptr, renderTargetView.put()));
+
+	D3D11_TEXTURE2D_DESC backBufferDesc;
+	renderTarget->GetDesc(&backBufferDesc);
+
 	CD3D11_TEXTURE2D_DESC depthStencilDesc(
 		depthBufferFormat,
 		static_cast<UINT> (backBufferDesc.Width),
@@ -145,21 +139,57 @@ void DirectXResource::configureBackBuffer()
 	CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc(D3D11_DSV_DIMENSION_TEXTURE2D);
 	check_hresult(device->CreateDepthStencilView(depthStencilBuffer.get(), &depthStencilViewDesc, depthStencilView.put()));
 
+
+	if (sampleCount > 1) {
+		CD3D11_TEXTURE2D_DESC renderTargetDesc(
+			backBufferFormat,
+			width,
+			height,
+			1, // The render target view has only one texture.
+			1, // Use a single mipmap level.
+			D3D11_BIND_RENDER_TARGET,
+			D3D11_USAGE_DEFAULT,
+			0,
+			sampleCount
+		);
+		check_hresult(device->CreateTexture2D(&renderTargetDesc, nullptr, msaaRenderTarget.put()));
+		CD3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc(D3D11_RTV_DIMENSION_TEXTURE2DMS, backBufferFormat);
+		check_hresult(device->CreateRenderTargetView(msaaRenderTarget.get(), &renderTargetViewDesc, msaaRenderTargetView.put()));
+
+		CD3D11_TEXTURE2D_DESC depthStencilDesc(
+			depthBufferFormat,
+			width,
+			height,
+			1, // This depth stencil view has only one texture.
+			1, // Use a single mipmap level.
+			D3D11_BIND_DEPTH_STENCIL,
+			D3D11_USAGE_DEFAULT,
+			0,
+			sampleCount
+		);
+
+		check_hresult(device->CreateTexture2D(&depthStencilDesc, nullptr, msaaDepthStencilBuffer.put()));
+		check_hresult(device->CreateDepthStencilView(msaaDepthStencilBuffer.get(), nullptr, msaaDepthStencilView.put()));
+	}
+
 	ZeroMemory(&viewPoint, sizeof(D3D11_VIEWPORT));
 	viewPoint.Height = (float)backBufferDesc.Height;
 	viewPoint.Width = (float)backBufferDesc.Width;
 	viewPoint.MinDepth = 0;
 	viewPoint.MaxDepth = 1;
-	context->RSSetViewports(1, &viewPoint);
 }
 
 void DirectXResource::releaseBackBuffer() {
 	ID3D11RenderTargetView* nullView[] = { nullptr };
 	context->OMSetRenderTargets(1, nullView, nullptr);
 	renderTargetView = nullptr;
-	backBuffer = nullptr;
+	renderTarget = nullptr;
 	depthStencilView = nullptr;
 	depthStencilBuffer = nullptr;
+	msaaRenderTargetView = nullptr;
+	msaaRenderTarget = nullptr;
+	msaaDepthStencilView = nullptr;
+	msaaDepthStencilBuffer = nullptr;
 	context->Flush();
 }
 
@@ -168,26 +198,41 @@ void DirectXResource::resize(int width, int height)
 	if (swapChain) {
 		releaseBackBuffer();
 		check_hresult(swapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING));
-		configureBackBuffer();
+		configureBackBuffer(width, height);
 	}
 }
 
 void DirectXResource::clear() {
 	const float teal[] = { 0.098f, 0.439f, 0.439f, 1.000f };
-	context->ClearRenderTargetView(
-		renderTargetView.get(),
-		teal
-	);
-	context->ClearDepthStencilView(
-		depthStencilView.get(),
-		D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
-		1.0f,
-		0);
-	context->OMSetRenderTargets(
-		1,
-		single_list(renderTargetView.get()),
-		depthStencilView.get()
-	);
+	if (sampleCount > 1) {
+
+		context->ClearRenderTargetView(msaaRenderTargetView.get(), teal);
+		context->ClearDepthStencilView(
+			msaaDepthStencilView.get(),
+			D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+			1.0f,
+			0);
+		context->OMSetRenderTargets(
+			1,
+			single_list(msaaRenderTargetView.get()),
+			msaaDepthStencilView.get()
+		);
+	}
+	else {
+		context->ClearRenderTargetView(renderTargetView.get(), teal);
+		context->ClearDepthStencilView(
+			depthStencilView.get(),
+			D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+			1.0f,
+			0);
+		context->OMSetRenderTargets(
+			1,
+			single_list(renderTargetView.get()),
+			depthStencilView.get()
+		);
+	}
+	context->RSSetViewports(1, &viewPoint);
+	
 }
 
 void DirectXResource::draw(const LoadedModel& model, const Matrix& world, const Matrix& view, const Matrix& projection)
@@ -286,5 +331,8 @@ LoadedModel DirectXResource::loadModel(const Model& model)
 }
 
 void DirectXResource::present() {
+	if (sampleCount > 1) {
+		context->ResolveSubresource(renderTarget.get(), 0, msaaRenderTarget.get(), 0, backBufferFormat);
+	}
 	check_hresult(swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
 }
